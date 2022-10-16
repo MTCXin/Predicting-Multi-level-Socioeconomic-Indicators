@@ -6,29 +6,19 @@ import torch.nn as nn
 import torch.optim as optim
 from sklearn.metrics import f1_score,roc_curve,accuracy_score, hinge_loss,auc,roc_auc_score,recall_score,cohen_kappa_score,hamming_loss
 import dgl
-from parser.StreetLevelPre_parser import Parser
-from model.StreetLevelPre_model import GIN
+from StreetLevelPre_parser import Parser
+from StreetLevelPre_model import GIN
 import os
 
-os.environ['CUDA_VISIBLE_DEVICES']='3'
+os.environ['CUDA_VISIBLE_DEVICES']='0'
 import setproctitle
 setproctitle.setproctitle('GCN@xinshiduo')
 
-dim_nfeats=128
-gclasses=4
-TRAIN_SIZE = 0.75
-TEST_SIZE = 0.25
-ABORT_ZERO=0.5
 
 def train(args, net, train_mask, optimizer, criterion, epoch,g,h0):
     net.train()
 
-    # running_loss = 0
-    # total_iters = len(trainloader)
-    # setup the offset to avoid the overlap with mouse cursor
-    bar = tqdm(range(1), unit='batch', position=2, file=sys.stdout)
-
-        # batch graphs will be shipped to device in forward part of model
+    # bar = tqdm(range(1), unit='batch', position=2, file=sys.stdout)
     labels = g.ndata['GT'].to(args.device)
     graphs = g.to(args.device)
 
@@ -42,8 +32,8 @@ def train(args, net, train_mask, optimizer, criterion, epoch,g,h0):
     optimizer.step()
 
     # report
-    bar.set_description('epoch-{}'.format(epoch))
-    bar.close()
+    # bar.set_description('epoch-{}'.format(epoch))
+    # bar.close()
 
     return loss.item()
 
@@ -99,34 +89,28 @@ def main(args):
 
     model = GIN(
         args.num_layers, args.num_mlp_layers,
-        dim_nfeats, args.hidden_dim, gclasses,
+        args.dim_nfeats, args.hidden_dim, args.gclasses,
         args.final_dropout, args.learn_eps,
         args.graph_pooling_type, args.neighbor_pooling_type).to(args.device)
 
-    criterion = nn.CrossEntropyLoss()  # defaul reduce is true
-    # optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    # for m in model.parameters():
-    #     print(m)
-    # model.w_1param=list(map(id,model.w_1))
-    (g,), _ = dgl.load_graphs('./data/graph-poinum4classV2_order_cnt.dgl')
+    criterion = nn.CrossEntropyLoss()  # defaul reduce is true  
+    (g,), _ = dgl.load_graphs('./data/graph_'+args.dataset+'.dgl')
     
     labels = g.ndata['GT']
     rd=np.random.rand(len(labels))
     rd2=np.random.rand(len(labels))
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
-    h0 = torch.load("/data/xinshiduo/code/20211115-PipelineFinal/params/Streeth0_58_order_cnt.pt").cuda()
-    zero_disab=torch.tensor(np.logical_and(rd2<ABORT_ZERO ,(np.array(labels))==0))
-    train_mask = torch.tensor(np.logical_and(rd< TRAIN_SIZE*0.2 , (~zero_disab)))
-    test_mask = torch.tensor(np.logical_and(rd>= TRAIN_SIZE  , (~zero_disab)))
+    h0 = torch.load('./data/h0_pretrain.pt').cuda()
+    zero_disab=torch.tensor(np.logical_and(rd2<args.ABORT_ZERO ,(np.array(labels))==0))
+    train_mask = torch.tensor(np.logical_and(rd< args.TRAIN_SIZE*0.2 , (~zero_disab)))
+    test_mask = torch.tensor(np.logical_and(rd>= args.TRAIN_SIZE  , (~zero_disab)))
     test_mask=test_mask.to(torch.bool).cuda()
     train_mask=train_mask.to(torch.bool).cuda()
 
-    # it's not cost-effective to hanle the cursor and init 0
-    # https://stackoverflow.com/a/23121189
-    tbar = tqdm(range(args.epochs), unit="epoch", position=3, ncols=0, file=sys.stdout)
-    vbar = tqdm(range(args.epochs), unit="epoch", position=4, ncols=0, file=sys.stdout)
-    lrbar = tqdm(range(args.epochs), unit="epoch", position=5, ncols=0, file=sys.stdout)
+    tbar = tqdm(range(args.epochs), unit="epoch", position=0, ncols=0, file=sys.stdout)
+    vbar = tqdm(range(args.epochs), unit="epoch", position=1, ncols=0, file=sys.stdout)
+    lrbar = tqdm(range(args.epochs), unit="epoch", position=2, ncols=0, file=sys.stdout)
 
     for epoch, _, _ in zip(tbar, vbar, lrbar):
 

@@ -7,35 +7,22 @@ import torch.nn as nn
 import torch.optim as optim
 import json
 import dgl
-from parser.RegionLevelPre_parser import Parser
-from model.RegionLevelPre_model import GIN
+from RegionLevelPre_parser import Parser
+from RegionLevelPre_model import GIN
 import os
 import random
 import pdb
 from sklearn.metrics import f1_score,roc_curve,accuracy_score, hinge_loss,auc,roc_auc_score,recall_score,cohen_kappa_score,hamming_loss
 
-os.environ['CUDA_VISIBLE_DEVICES']='5'
+os.environ['CUDA_VISIBLE_DEVICES']='0'
 import setproctitle
 setproctitle.setproctitle('GCN@xinshiduo')
-
-dim_nfeats=128
-gclasses=4
-
-alpha=1.2
-
-TRAIN_SIZE = 0.75
-TEST_SIZE = 0.25
-ABORT_ZERO=0.5
 
 def train(args, net, train_mask, optimizer, criterion, epoch,g,regionkeylist,regionlabeldict,h0):
     net.train()
 
-    # running_loss = 0
-    # total_iters = len(trainloader)
-    # setup the offset to avoid the overlap with mouse cursor
-    bar = tqdm(range(1), unit='batch', position=2, file=sys.stdout)
 
-        # batch graphs will be shipped to device in forward part of model
+    # bar = tqdm(range(1), unit='batch', position=0, file=sys.stdout)
     graphs = g.to(args.device)
     graphoutputs = net(graphs,h0)
     batchkeys=random.sample(list(regionkeylist),args.batch_size)
@@ -54,8 +41,8 @@ def train(args, net, train_mask, optimizer, criterion, epoch,g,regionkeylist,reg
     optimizer.step()
 
     # report
-    bar.set_description('epoch-{}'.format(epoch))
-    bar.close()
+    # bar.set_description('epoch-{}'.format(epoch))
+    # bar.close()
 
     return 0,regionloss.item()
 
@@ -73,7 +60,6 @@ def eval_net(args, net, test_mask, criterion,g,regionkeylist,regionlabeldict,h0)
     regionmask=torch.tensor(regionlabeldict[regionkeylist[0]]['streets']).cuda()
     outputs=torch.sum(graphoutputs[regionmask],dim=0).unsqueeze(0)
     labels=torch.tensor(regionlabeldict[regionkeylist[0]]['GT']).cuda().unsqueeze(0)
-    # pdb.set_trace()
     regionloss+=criterion(outputs,labels)
     _, predicted = torch.max(outputs.data, 1)
     if (predicted == labels):
@@ -82,7 +68,6 @@ def eval_net(args, net, test_mask, criterion,g,regionkeylist,regionlabeldict,h0)
         regionmask=torch.tensor(regionlabeldict[regionkeylist[i]]['streets']).cuda()
         selectgraphoutput=torch.sum(graphoutputs[regionmask],dim=0).unsqueeze(0)
         lab=torch.tensor(regionlabeldict[regionkeylist[i]]['GT']).cuda().unsqueeze(0)
-        # pdb.set_trace()
         labels=torch.cat((labels,lab),0)
         outputs=torch.cat((outputs,selectgraphoutput),0)
         regionloss+=criterion(selectgraphoutput,lab)
@@ -124,26 +109,14 @@ def main(args):
     else:
         args.device = torch.device("cpu")
 
-    # dataset = MyDataset()
-
-    # trainloader, validloader = GINDataLoader(
-    #     dataset, batch_size=args.batch_size, device=args.device,
-    #     seed=args.seed, shuffle=True,
-    #     split_name='fold10', fold_idx=args.fold_idx).train_valid_loader()
-    # # or split_name='rand', split_ratio=0.7
-
     model = GIN(
         args.num_layers, args.num_mlp_layers,
-        dim_nfeats, args.hidden_dim, gclasses,
+        args.dim_nfeats, args.hidden_dim, args.gclasses,
         args.final_dropout, args.learn_eps,
         args.graph_pooling_type, args.neighbor_pooling_type).to(args.device)
 
     criterion = nn.CrossEntropyLoss()  # defaul reduce is true
-    # optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    # for m in model.parameters():
-    #     print(m)
-    # model.w_1param=list(map(id,model.w_1))
-    (g,), _ = dgl.load_graphs("./data/graph-poinum4classV2_poi_num.dgl")
+    (g,), _ = dgl.load_graphs("./data/graph_poi_num.dgl")
     labels = g.ndata['GT']
     rd=np.random.rand(len(labels))
     rd2=np.random.rand(len(labels))
@@ -151,28 +124,24 @@ def main(args):
 
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=1000, gamma=0.5)
     
-    zero_disab=torch.tensor(np.logical_and(rd2<ABORT_ZERO ,(np.array(labels))==0))
-    train_mask = torch.tensor(np.logical_and(rd< TRAIN_SIZE , (~zero_disab)))
+    zero_disab=torch.tensor(np.logical_and(rd2<args.ABORT_ZERO ,(np.array(labels))==0))
+    train_mask = torch.tensor(np.logical_and(rd< args.TRAIN_SIZE , (~zero_disab)))
     test_mask = torch.tensor(np.logical_and(~(train_mask) , (~zero_disab)))
     test_mask=test_mask.to(torch.bool).cuda()
     train_mask=train_mask.to(torch.bool).cuda()
-    h0 = torch.load("/data/xinshiduo/code/20211115-PipelineFinal/params/Streeth0_46_poi_num.pt").cuda()
-
-    file = open('./data/MUTregionlabel_firm.json',encoding='utf-8')
+    h0 = torch.load('./data/h0_pretrain.pt').cuda()
+    file = open('./data/MUTregionlabel_'+args.dataset+'.json',encoding='utf-8')
     regionlabeldict=json.load(file)
     keylist=list(regionlabeldict.keys())
     rd3=np.random.rand(len(keylist))
     keylist=np.array(keylist)
-    train_keylist=keylist[rd3<TRAIN_SIZE*0.2]
-    test_keylist=keylist[rd3>TRAIN_SIZE]
+    train_keylist=keylist[rd3<args.TRAIN_SIZE*0.2]
+    test_keylist=keylist[rd3>args.TRAIN_SIZE]
     print('train_keylist length:',len(list(train_keylist)))
     print('test_keylist length:',len(list(test_keylist)))
-
-    # it's not cost-effective to hanle the cursor and init 0
-    # https://stackoverflow.com/a/23121189
-    tbar = tqdm(range(args.epochs), unit="epoch", position=3, ncols=0, file=sys.stdout)
-    vbar = tqdm(range(args.epochs), unit="epoch", position=4, ncols=0, file=sys.stdout)
-    lrbar = tqdm(range(args.epochs), unit="epoch", position=5, ncols=0, file=sys.stdout)
+    tbar = tqdm(range(args.epochs), unit="epoch", position=0, ncols=0, file=sys.stdout)
+    vbar = tqdm(range(args.epochs), unit="epoch", position=1, ncols=0, file=sys.stdout)
+    lrbar = tqdm(range(args.epochs), unit="epoch", position=2, ncols=0, file=sys.stdout)
 
     for epoch, _, _ in zip(tbar, vbar, lrbar):
 
@@ -182,14 +151,14 @@ def main(args):
             nodetrain_loss, nodetrain_acc, regiontrain_loss, regiontrain_acc,_,_,_,_,_ = eval_net(
                 args, model, train_mask, criterion,g,train_keylist,regionlabeldict,h0)
             tbar.set_description(
-                'train set - node loss: {:.4f}, node accuracy: {:.0f}%, region loss: {:.4f}, region accuracy: {:.0f}%'
-                .format(nodetrain_loss, 100. * nodetrain_acc, regiontrain_loss, 100. * regiontrain_acc))
+                'train set - region loss: {:.4f}, region accuracy: {:.0f}%'
+                .format(regiontrain_loss, 100. * regiontrain_acc))
 
             nodevalid_loss, nodevalid_acc, regionvalid_loss, regionvalid_acc,f1score,auc,kappa,ham,rescore = eval_net(
                 args, model, test_mask, criterion,g,test_keylist,regionlabeldict,h0)
             vbar.set_description(
-                'valid set - node loss: {:.4f}, node accuracy: {:.0f}%, region loss: {:.4f}, region accuracy: {:.0f}%'
-                .format(nodevalid_loss, 100. * nodevalid_acc, regionvalid_loss, 100. * regionvalid_acc))
+                'valid set - region loss: {:.4f}, region accuracy: {:.0f}%'
+                .format(regionvalid_loss, 100. * regionvalid_acc))
 
             if not args.filename == "":
                 with open(args.filename, 'a') as f:
@@ -203,10 +172,6 @@ def main(args):
                     f.write("train: %f %f valid:%f acc:%f f1:%f \n auc%f kappa:%f ham:%f rescore:%f" % (
                         regiontrain_loss, 100. * regiontrain_acc, regionvalid_loss, 100. * regionvalid_acc,f1score,auc,kappa,ham,rescore
                     ))
-             
-            # lrbar.set_description(
-            #     "Learning eps with learn_eps={}: {}".format(
-            #         args.learn_eps, [layer.eps.data.item() for layer in model.ginlayers]))
 
     tbar.close()
     vbar.close()

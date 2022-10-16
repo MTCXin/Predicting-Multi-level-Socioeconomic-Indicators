@@ -14,9 +14,9 @@ class Parser():
     def _parse(self):
         # dataset
         self.parser.add_argument(
-            '--dataset', type=str, default="MUTAG",
-            choices=['MUTAG', 'COLLAB', 'IMDBBINARY', 'IMDBMULTI'],
-            help='name of dataset (default: MUTAG)')
+            '--dataset', type=str, default="population",
+            choices=['population', 'economic_act', 'resident_cons'],
+            help='name of dataset (default: population)')
         self.parser.add_argument(
             '--batch_size', type=int, default=128,
             help='batch size for training and validation (default: 32)')
@@ -72,6 +72,21 @@ class Parser():
         self.parser.add_argument(
             '--final_dropout', type=float, default=0,
             help='final layer dropout (default: 0.5)')
-
+        # 
+        self.parser.add_argument(
+            '--dim_nfeats', type=int, default=128,
+            help='dimention of data feature (default: 128)')
+        self.parser.add_argument(
+            '--gclasses', type=int, default=4,
+            help='final classification number(default: 4)')
+        self.parser.add_argument(
+            '--TRAIN_SIZE', type=float, default=0.75,
+            help='partition of data for training (default: 0.75)')
+        self.parser.add_argument(
+            '--TEST_SIZE', type=float, default=0.25,
+            help='partition of data for testing (default: 0.25)')
+        self.parser.add_argument(
+            '--ABORT_ZERO', type=float, default=0.5,
+            help='original data includes some region with 0 value indicator (default: 0.5)')
         # done
         self.args = self.parser.parse_args()
