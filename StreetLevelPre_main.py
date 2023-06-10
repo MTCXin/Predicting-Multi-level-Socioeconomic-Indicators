@@ -8,11 +8,6 @@ from sklearn.metrics import f1_score,roc_curve,accuracy_score, hinge_loss,auc,ro
 import dgl
 from StreetLevelPre_parser import Parser
 from StreetLevelPre_model import GIN
-import os
-
-os.environ['CUDA_VISIBLE_DEVICES']='0'
-import setproctitle
-setproctitle.setproctitle('GCN@xinshiduo')
 
 
 def train(args, net, train_mask, optimizer, criterion, epoch,g,h0):
@@ -94,14 +89,14 @@ def main(args):
         args.graph_pooling_type, args.neighbor_pooling_type).to(args.device)
 
     criterion = nn.CrossEntropyLoss()  # defaul reduce is true  
-    (g,), _ = dgl.load_graphs('./data/graph_'+args.dataset+'.dgl')
+    (g,), _ = dgl.load_graphs('./data/graph.dgl')
     
     labels = g.ndata['GT']
     rd=np.random.rand(len(labels))
     rd2=np.random.rand(len(labels))
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
-    h0 = torch.load('./data/h0_pretrain.pt').cuda()
+    h0 = torch.load('./data/pretrain_model.pt').cuda()
     zero_disab=torch.tensor(np.logical_and(rd2<args.ABORT_ZERO ,(np.array(labels))==0))
     train_mask = torch.tensor(np.logical_and(rd< args.TRAIN_SIZE*0.2 , (~zero_disab)))
     test_mask = torch.tensor(np.logical_and(rd>= args.TRAIN_SIZE  , (~zero_disab)))

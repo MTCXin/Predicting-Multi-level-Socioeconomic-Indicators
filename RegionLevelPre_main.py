@@ -14,9 +14,6 @@ import random
 import pdb
 from sklearn.metrics import f1_score,roc_curve,accuracy_score, hinge_loss,auc,roc_auc_score,recall_score,cohen_kappa_score,hamming_loss
 
-os.environ['CUDA_VISIBLE_DEVICES']='0'
-import setproctitle
-setproctitle.setproctitle('GCN@xinshiduo')
 
 def train(args, net, train_mask, optimizer, criterion, epoch,g,regionkeylist,regionlabeldict,h0):
     net.train()
@@ -116,7 +113,7 @@ def main(args):
         args.graph_pooling_type, args.neighbor_pooling_type).to(args.device)
 
     criterion = nn.CrossEntropyLoss()  # defaul reduce is true
-    (g,), _ = dgl.load_graphs("./data/graph_poi_num.dgl")
+    (g,), _ = dgl.load_graphs("./data/graph.dgl")
     labels = g.ndata['GT']
     rd=np.random.rand(len(labels))
     rd2=np.random.rand(len(labels))
@@ -129,8 +126,8 @@ def main(args):
     test_mask = torch.tensor(np.logical_and(~(train_mask) , (~zero_disab)))
     test_mask=test_mask.to(torch.bool).cuda()
     train_mask=train_mask.to(torch.bool).cuda()
-    h0 = torch.load('./data/h0_pretrain.pt').cuda()
-    file = open('./data/MUTregionlabel_'+args.dataset+'.json',encoding='utf-8')
+    h0 = torch.load('./data/pretrain_model.pt').cuda()
+    file = open('./data/MUTregionlabel.json',encoding='utf-8')
     regionlabeldict=json.load(file)
     keylist=list(regionlabeldict.keys())
     rd3=np.random.rand(len(keylist))

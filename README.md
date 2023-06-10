@@ -4,32 +4,30 @@ A framework for Predicting Multi-level Socioeconomic Indicators from Structural 
 
 
 ## Enviroment setup
-
+- python 3.7
+- torch 1.10
 
 
 ## Running code
 
-To pretrain the model on CIFAR-10 with a *single* GPU, try the following command:
+To run the model, just a simple command:
 
 ```
-python run.py --train_mode=pretrain \
-  --train_batch_size=512 --train_epochs=1000 \
-  --learning_rate=1.0 --weight_decay=1e-4 --temperature=0.5 \
-  --dataset=cifar10 --image_size=32 --eval_split=test --resnet_depth=18 \
-  --use_blur=False --color_jitter_strength=0.5 \
-  --model_dir=/tmp/simclr_test --use_tpu=False
+python run.py 
 ```
 
 
 ## Cite
 
-[SimCLR paper](https://arxiv.org/abs/2002.05709):
+[paper](https://dl.acm.org/doi/abs/10.1145/3511808.3557153):
 
 ```
-@article{chen2020simple,
-  title={A Simple Framework for Contrastive Learning of Visual Representations},
-  author={Chen, Ting and Kornblith, Simon and Norouzi, Mohammad and Hinton, Geoffrey},
-  journal={arXiv preprint arXiv:2002.05709},
-  year={2020}
+@inproceedings{li2022predicting,
+  title={Predicting Multi-level Socioeconomic Indicators from Structural Urban Imagery},
+  author={Li, Tong and Xin, Shiduo and Xi, Yanxin and Tarkoma, Sasu and Hui, Pan and Li, Yong},
+  booktitle={Proceedings of the 31st ACM International Conference on Information \& Knowledge Management},
+  pages={3282--3291},
+  year={2022}
+
 }
 ```
