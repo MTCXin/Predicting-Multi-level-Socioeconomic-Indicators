@@ -6,7 +6,7 @@ A framework for Predicting Multi-level Socioeconomic Indicators from Structural 
 ## Enviroment setup
 - python 3.7
 - torch 1.10
-
+- pretrained data in ./data could be found at https://drive.google.com/drive/folders/17fzwdCAGEHDcP_PgUrjxmIgnCQrGfzeT?usp=sharing
 
 ## Running code
 
